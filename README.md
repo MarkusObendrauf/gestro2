@@ -58,6 +58,26 @@ Then **log out and back in** for the change to take effect.
 
 If Gestro can't access input devices, it will show an error in the settings window.
 
+### macOS: Setup
+
+**Opening the app for the first time:** Gestro is not notarized by Apple (it's open-source and free). macOS may refuse to open it. To get around this:
+1. Open **Terminal** and run: `xattr -cr /Applications/Gestro.app`
+2. Then launch Gestro normally from your Applications folder
+
+**Granting Accessibility permission:** Gestro needs Accessibility access to intercept mouse events. On first launch, macOS should prompt you. If it doesn't, or if gestures aren't working:
+1. Open **System Settings > Privacy & Security > Accessibility**
+2. Click the **+** button and add **Gestro.app** from your Applications folder
+3. Make sure the toggle next to Gestro is **on**
+4. Quit and relaunch Gestro
+
+If you still have issues after granting permission, try resetting it:
+```
+tccutil reset Accessibility com.gestro.gestro
+```
+Then relaunch Gestro and re-add it in Accessibility settings.
+
+**Note:** Always launch Gestro from the Applications folder (or Spotlight), not by running the binary directly — macOS ties Accessibility permissions to the `.app` bundle path.
+
 ## Usage
 
 After installing, Gestro starts in the system tray (the small icon area near your clock).
@@ -103,7 +123,18 @@ These are just suggestions — you can bind any keyboard shortcut to any directi
 
 **Gestro doesn't respond to gestures**
 - On Linux, make sure you're in the `input` group (see [Permission Setup](#linux-permission-setup))
+- On macOS, make sure Accessibility permission is granted (see [macOS: Setup](#macos-setup))
 - Check the tray icon — if there's an error, the settings window will show details
+
+**macOS: "Gestro.app is damaged and can't be opened"**
+- This is Gatekeeper blocking an unsigned app. Run `xattr -cr /Applications/Gestro.app` in Terminal, then try again.
+
+**macOS: Gestures still don't work after granting Accessibility**
+- Quit Gestro, run `tccutil reset Accessibility com.gestro.gestro` in Terminal, then relaunch and re-add it in System Settings > Privacy & Security > Accessibility.
+- Make sure you're launching from `/Applications`, not running the binary directly.
+
+**macOS: Browser navigation keys (BrowserBack/BrowserForward) don't work**
+- macOS has no standard keycodes for browser navigation. Use `Cmd+[` and `Cmd+]` instead, which work in most browsers.
 
 **Right-click menu stopped working**
 - This shouldn't happen. If you right-click without dragging (or drag only a tiny amount), Gestro passes through a normal right-click. Try increasing the threshold in settings if you're accidentally triggering gestures.

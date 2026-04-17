@@ -44,11 +44,10 @@ fn save_config(
         }
     }
 
-    // Push updated config to the grab thread
-    state
-        .config_tx
-        .send(config.clone())
-        .map_err(|e| format!("Failed to send config update: {e}"))?;
+    // Push updated config to the grab thread (non-fatal if grab thread is dead)
+    if let Err(e) = state.config_tx.send(config.clone()) {
+        log::warn!("Grab thread not running, config saved to disk only: {e}");
+    }
 
     *state.config.lock().unwrap() = config;
     Ok(())
@@ -114,6 +113,16 @@ pub fn run() {
                     _ => {}
                 })
                 .build(app)?;
+
+            // Sync autostart desktop entry with current binary path on every launch.
+            // This ensures the .desktop file stays correct if the binary moves.
+            let autostart = app.handle().autolaunch();
+            let launch_at_login = app.state::<AppState>().config.lock().unwrap().launch_at_login;
+            if launch_at_login {
+                if let Err(e) = autostart.enable() {
+                    log::warn!("Failed to sync autostart: {e}");
+                }
+            }
 
             log::info!("Gestro started — listening for gestures");
             Ok(())

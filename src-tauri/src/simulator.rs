@@ -1,30 +1,44 @@
 use crate::config::Shortcut;
 use enigo::{Enigo, Keyboard, Settings};
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicU32, Ordering};
 
-/// Global flag to prevent the grab callback from re-capturing synthetic events.
-pub static SIMULATING: AtomicBool = AtomicBool::new(false);
+/// Count of simulated right-button events the grab callback should pass through.
+/// Set before simulating; the grab callback decrements as it processes each one.
+pub static SIMULATING: AtomicU32 = AtomicU32::new(0);
 
 /// Replay a right-click at the current cursor position.
-/// Sets SIMULATING flag so the grab callback passes these events through.
 pub fn replay_right_click() {
-    SIMULATING.store(true, Ordering::SeqCst);
+    // Tell the grab callback to pass through the next 2 right-button events
+    SIMULATING.store(2, Ordering::SeqCst);
 
-    let result = (|| {
-        rdev::simulate(&rdev::EventType::ButtonPress(rdev::Button::Right))
-            .map_err(|e| format!("Failed to simulate right press: {e:?}"))?;
+    let press_ok = rdev::simulate(&rdev::EventType::ButtonPress(rdev::Button::Right));
+    std::thread::sleep(std::time::Duration::from_millis(10));
+    let release_ok = rdev::simulate(&rdev::EventType::ButtonRelease(rdev::Button::Right));
+
+    if let Err(ref e) = press_ok {
+        log::error!("Failed to simulate right press: {e:?}");
+    }
+    if let Err(ref e) = release_ok {
+        log::error!("Failed to simulate right release: {e:?}");
+    }
+
+    if press_ok.is_err() || release_ok.is_err() {
+        SIMULATING.store(0, Ordering::SeqCst);
+        return;
+    }
+
+    // Wait for the grab callback to process both events (up to 200ms)
+    for _ in 0..20 {
+        if SIMULATING.load(Ordering::SeqCst) == 0 {
+            return;
+        }
         std::thread::sleep(std::time::Duration::from_millis(10));
-        rdev::simulate(&rdev::EventType::ButtonRelease(rdev::Button::Right))
-            .map_err(|e| format!("Failed to simulate right release: {e:?}"))?;
-        Ok::<(), String>(())
-    })();
+    }
 
-    // Small delay to ensure events are processed before clearing flag
-    std::thread::sleep(std::time::Duration::from_millis(20));
-    SIMULATING.store(false, Ordering::SeqCst);
-
-    if let Err(e) = result {
-        log::error!("replay_right_click failed: {e}");
+    // Safety: force-clear if events weren't processed in time
+    let remaining = SIMULATING.swap(0, Ordering::SeqCst);
+    if remaining > 0 {
+        log::warn!("Simulated right-click events not processed in time ({remaining} remaining), force-cleared");
     }
 }
 

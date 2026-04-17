@@ -26,10 +26,11 @@
   }
 
   async function saveConfig(newConfig: GestroConfig) {
+    config = newConfig;
     try {
       await invoke("save_config", { config: newConfig });
-      config = newConfig;
     } catch (e) {
+      try { config = await invoke<GestroConfig>("get_config"); } catch {}
       status = "error";
       errorMessage = String(e);
     }

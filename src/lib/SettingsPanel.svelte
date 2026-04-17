@@ -7,18 +7,13 @@
   }
   let { config, onUpdate }: Props = $props();
 
-  let threshold = $state(config.threshold);
-  let launchAtLogin = $state(config.launch_at_login);
-
   function updateThreshold(e: Event) {
     const value = parseFloat((e.target as HTMLInputElement).value);
-    threshold = value;
     onUpdate({ ...config, threshold: value });
   }
 
   function toggleLaunchAtLogin() {
-    launchAtLogin = !launchAtLogin;
-    onUpdate({ ...config, launch_at_login: launchAtLogin });
+    onUpdate({ ...config, launch_at_login: !config.launch_at_login });
   }
 </script>
 
@@ -31,8 +26,8 @@
       <span class="setting-desc">Minimum distance (px) before a gesture is recognized</span>
     </div>
     <div class="slider-row">
-      <input type="range" min="20" max="200" step="5" value={threshold} oninput={updateThreshold} />
-      <span class="value">{threshold}px</span>
+      <input type="range" min="20" max="200" step="5" value={config.threshold} oninput={updateThreshold} />
+      <span class="value">{config.threshold}px</span>
     </div>
   </label>
 
@@ -43,10 +38,10 @@
     </div>
     <button
       class="toggle"
-      class:active={launchAtLogin}
+      class:active={config.launch_at_login}
       onclick={toggleLaunchAtLogin}
       role="switch"
-      aria-checked={launchAtLogin}
+      aria-checked={config.launch_at_login}
     >
       <span class="toggle-knob"></span>
     </button>

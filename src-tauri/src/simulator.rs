@@ -106,8 +106,9 @@ fn fire_shortcut_impl(shortcut: &Shortcut) {
 /// requires the main dispatch queue.
 #[cfg(target_os = "macos")]
 fn dispatch_to_main<F: FnOnce() + Send + 'static>(f: F) {
+    // dispatch_get_main_queue() is a C macro expanding to &_dispatch_main_q
     extern "C" {
-        fn dispatch_get_main_queue() -> *const std::ffi::c_void;
+        static _dispatch_main_q: std::ffi::c_void;
         fn dispatch_async_f(
             queue: *const std::ffi::c_void,
             context: *mut std::ffi::c_void,
@@ -122,7 +123,8 @@ fn dispatch_to_main<F: FnOnce() + Send + 'static>(f: F) {
 
     let context = Box::into_raw(Box::new(f)) as *mut std::ffi::c_void;
     unsafe {
-        dispatch_async_f(dispatch_get_main_queue(), context, trampoline::<F>);
+        let queue = &_dispatch_main_q as *const std::ffi::c_void;
+        dispatch_async_f(queue, context, trampoline::<F>);
     }
 }
 

@@ -71,6 +71,12 @@ fn fire_shortcut_impl(shortcut: &Shortcut) {
         }
     }
 
+    // Let the OS register modifier state before sending the main key.
+    // Without this, macOS often misses the modifier (e.g. Meta+T → just T).
+    if !shortcut.modifiers.is_empty() {
+        std::thread::sleep(std::time::Duration::from_millis(20));
+    }
+
     // Press and release the main key
     if let Some(key) = string_to_enigo_key(&shortcut.key) {
         if let Err(e) = enigo.key(key, enigo::Direction::Click) {

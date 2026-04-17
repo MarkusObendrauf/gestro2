@@ -202,14 +202,22 @@ fn run_grab(
         CGEventType::RightMouseDragged,
     ];
 
-    dlog!("run_grab: creating event tap");
+    // Check accessibility status before attempting to create the tap.
+    let trusted = unsafe {
+        extern "C" {
+            fn AXIsProcessTrusted() -> bool;
+        }
+        AXIsProcessTrusted()
+    };
+    dlog!("run_grab: AXIsProcessTrusted() = {trusted}");
+    dlog!("run_grab: creating event tap (pid={})", std::process::id());
 
     // SAFETY: The event tap is dropped at the end of this function.
     // The captured references (tracker, rx) are owned by this stack frame
     // and outlive the tap.
     let event_tap = unsafe {
         CGEventTap::new_unchecked(
-            CGEventTapLocation::HID,
+            CGEventTapLocation::Session,
             CGEventTapPlacement::HeadInsertEventTap,
             CGEventTapOptions::Default,
             events,

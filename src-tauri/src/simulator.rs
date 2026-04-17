@@ -136,6 +136,18 @@ fn string_to_enigo_key(name: &str) -> Option<enigo::Key> {
         "F10" => Some(enigo::Key::F10),
         "F11" => Some(enigo::Key::F11),
         "F12" => Some(enigo::Key::F12),
+        // Media keys
+        "MediaPlayPause" => Some(enigo::Key::MediaPlayPause),
+        "MediaNextTrack" | "MediaTrackNext" => Some(enigo::Key::MediaNextTrack),
+        "MediaPrevTrack" | "MediaTrackPrevious" => Some(enigo::Key::MediaPrevTrack),
+        "AudioVolumeUp" | "VolumeUp" => Some(enigo::Key::VolumeUp),
+        "AudioVolumeDown" | "VolumeDown" => Some(enigo::Key::VolumeDown),
+        "AudioVolumeMute" | "VolumeMute" => Some(enigo::Key::VolumeMute),
+        // Browser keys — no named enigo variant on Linux, use raw X11 keysyms
+        "BrowserBack" => Some(enigo::Key::Other(0x1008FF26)),
+        "BrowserForward" => Some(enigo::Key::Other(0x1008FF27)),
+        "BrowserRefresh" => Some(enigo::Key::Other(0x1008FF29)),
+        "BrowserHome" => Some(enigo::Key::Other(0x1008FF18)),
         _ => None,
     }
 }

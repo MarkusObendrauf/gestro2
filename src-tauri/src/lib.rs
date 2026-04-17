@@ -93,6 +93,66 @@ pub fn run() {
         })
         .invoke_handler(tauri::generate_handler![get_config, save_config])
         .setup(|app| {
+            // On macOS, prompt for Accessibility permission before starting the grab thread.
+            // AXIsProcessTrustedWithOptions with kAXTrustedCheckOptionPrompt shows the
+            // system dialog directing the user to System Settings.
+            #[cfg(target_os = "macos")]
+            {
+                extern "C" {
+                    fn AXIsProcessTrustedWithOptions(
+                        options: *const std::ffi::c_void,
+                    ) -> bool;
+                }
+                extern "C" {
+                    fn CFDictionaryCreate(
+                        allocator: *const std::ffi::c_void,
+                        keys: *const *const std::ffi::c_void,
+                        values: *const *const std::ffi::c_void,
+                        num_values: isize,
+                        key_callbacks: *const std::ffi::c_void,
+                        value_callbacks: *const std::ffi::c_void,
+                    ) -> *const std::ffi::c_void;
+                    fn CFRelease(cf: *const std::ffi::c_void);
+                    static kCFBooleanTrue: *const std::ffi::c_void;
+                    static kCFTypeDictionaryKeyCallBacks: u8;
+                    static kCFTypeDictionaryValueCallBacks: u8;
+                }
+                // "AXTrustedCheckOptionPrompt" as a CFString
+                let prompt_key: *const std::ffi::c_void = {
+                    extern "C" {
+                        fn CFStringCreateWithCString(
+                            alloc: *const std::ffi::c_void,
+                            c_str: *const u8,
+                            encoding: u32,
+                        ) -> *const std::ffi::c_void;
+                    }
+                    unsafe {
+                        CFStringCreateWithCString(
+                            std::ptr::null(),
+                            b"AXTrustedCheckOptionPrompt\0".as_ptr(),
+                            0x08000100, // kCFStringEncodingUTF8
+                        )
+                    }
+                };
+                let trusted = unsafe {
+                    let keys = [prompt_key];
+                    let values = [kCFBooleanTrue];
+                    let dict = CFDictionaryCreate(
+                        std::ptr::null(),
+                        keys.as_ptr(),
+                        values.as_ptr(),
+                        1,
+                        &kCFTypeDictionaryKeyCallBacks as *const u8 as *const std::ffi::c_void,
+                        &kCFTypeDictionaryValueCallBacks as *const u8 as *const std::ffi::c_void,
+                    );
+                    let result = AXIsProcessTrustedWithOptions(dict);
+                    CFRelease(dict);
+                    CFRelease(prompt_key);
+                    result
+                };
+                log::info!("macOS Accessibility trusted: {trusted}");
+            }
+
             // Start the grab thread with access to app handle for error events
             grabber::spawn(app.handle().clone(), grab_config, grab_rx);
 

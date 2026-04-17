@@ -108,7 +108,14 @@ pub fn spawn(app: tauri::AppHandle, config: GestroConfig, config_rx: Receiver<Ge
                     return;
                 }
                 Err(e) => {
-                    let msg = format!("Grab failed: {e:?}. Check that you have input permissions (e.g. add your user to the 'input' group on Linux).");
+                    let hint = if cfg!(target_os = "linux") {
+                        "Add your user to the 'input' group."
+                    } else if cfg!(target_os = "macos") {
+                        "Grant Accessibility permission in System Settings > Privacy & Security."
+                    } else {
+                        "Try running the app as administrator."
+                    };
+                    let msg = format!("Grab failed: {e:?}. {hint}");
                     log::error!("{msg}");
                     let _ = app.emit("grab-error", msg);
 

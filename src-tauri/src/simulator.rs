@@ -136,18 +136,49 @@ fn string_to_enigo_key(name: &str) -> Option<enigo::Key> {
         "F10" => Some(enigo::Key::F10),
         "F11" => Some(enigo::Key::F11),
         "F12" => Some(enigo::Key::F12),
-        // Media keys
+        // Media keys (cross-platform enigo variants)
         "MediaPlayPause" => Some(enigo::Key::MediaPlayPause),
         "MediaNextTrack" | "MediaTrackNext" => Some(enigo::Key::MediaNextTrack),
         "MediaPrevTrack" | "MediaTrackPrevious" => Some(enigo::Key::MediaPrevTrack),
         "AudioVolumeUp" | "VolumeUp" => Some(enigo::Key::VolumeUp),
         "AudioVolumeDown" | "VolumeDown" => Some(enigo::Key::VolumeDown),
         "AudioVolumeMute" | "VolumeMute" => Some(enigo::Key::VolumeMute),
-        // Browser keys — no named enigo variant on Linux, use raw X11 keysyms
-        "BrowserBack" => Some(enigo::Key::Other(0x1008FF26)),
-        "BrowserForward" => Some(enigo::Key::Other(0x1008FF27)),
-        "BrowserRefresh" => Some(enigo::Key::Other(0x1008FF29)),
-        "BrowserHome" => Some(enigo::Key::Other(0x1008FF18)),
+        // Browser keys — platform-specific mappings
+        "BrowserBack" => browser_key_back(),
+        "BrowserForward" => browser_key_forward(),
+        "BrowserRefresh" => browser_key_refresh(),
+        "BrowserHome" => browser_key_home(),
         _ => None,
     }
 }
+
+// Browser keys: enigo has named variants on Windows, raw X11 keysyms on Linux.
+// macOS has no standard keycodes for browser navigation — users should bind
+// Cmd+[ / Cmd+] etc. instead.
+
+#[cfg(target_os = "windows")]
+fn browser_key_back() -> Option<enigo::Key> { Some(enigo::Key::BrowserBack) }
+#[cfg(target_os = "windows")]
+fn browser_key_forward() -> Option<enigo::Key> { Some(enigo::Key::BrowserForward) }
+#[cfg(target_os = "windows")]
+fn browser_key_refresh() -> Option<enigo::Key> { Some(enigo::Key::BrowserRefresh) }
+#[cfg(target_os = "windows")]
+fn browser_key_home() -> Option<enigo::Key> { Some(enigo::Key::BrowserHome) }
+
+#[cfg(all(unix, not(target_os = "macos")))]
+fn browser_key_back() -> Option<enigo::Key> { Some(enigo::Key::Other(0x1008FF26)) }
+#[cfg(all(unix, not(target_os = "macos")))]
+fn browser_key_forward() -> Option<enigo::Key> { Some(enigo::Key::Other(0x1008FF27)) }
+#[cfg(all(unix, not(target_os = "macos")))]
+fn browser_key_refresh() -> Option<enigo::Key> { Some(enigo::Key::Other(0x1008FF29)) }
+#[cfg(all(unix, not(target_os = "macos")))]
+fn browser_key_home() -> Option<enigo::Key> { Some(enigo::Key::Other(0x1008FF18)) }
+
+#[cfg(target_os = "macos")]
+fn browser_key_back() -> Option<enigo::Key> { None }
+#[cfg(target_os = "macos")]
+fn browser_key_forward() -> Option<enigo::Key> { None }
+#[cfg(target_os = "macos")]
+fn browser_key_refresh() -> Option<enigo::Key> { None }
+#[cfg(target_os = "macos")]
+fn browser_key_home() -> Option<enigo::Key> { None }

@@ -170,7 +170,7 @@ fn run_grab(
     rx: Receiver<GestroConfig>,
 ) -> Result<(), String> {
     use core_graphics::event::*;
-    use core_foundation::runloop::CFRunLoop;
+    use core_foundation::runloop::{kCFRunLoopDefaultMode, CFRunLoop};
 
     let events = vec![
         CGEventType::RightMouseDown,
@@ -179,31 +179,56 @@ fn run_grab(
         CGEventType::RightMouseDragged,
     ];
 
-    CGEventTap::with_enabled(
-        CGEventTapLocation::HID,
-        CGEventTapPlacement::HeadInsertEventTap,
-        CGEventTapOptions::Default,
-        events,
-        |_proxy, etype, event| {
-            let grab_event = match etype {
-                CGEventType::RightMouseDown => GrabEventType::RightPress,
-                CGEventType::RightMouseUp => GrabEventType::RightRelease,
-                CGEventType::MouseMoved | CGEventType::RightMouseDragged => {
-                    let loc = event.location();
-                    GrabEventType::MouseMove { x: loc.x, y: loc.y }
-                }
-                _ => GrabEventType::Other,
-            };
+    // SAFETY: The event tap is dropped at the end of this function.
+    // The captured references (tracker, rx) are owned by this stack frame
+    // and outlive the tap.
+    let event_tap = unsafe {
+        CGEventTap::new_unchecked(
+            CGEventTapLocation::HID,
+            CGEventTapPlacement::HeadInsertEventTap,
+            CGEventTapOptions::Default,
+            events,
+            |_proxy, etype, event| {
+                let grab_event = match etype {
+                    CGEventType::RightMouseDown => GrabEventType::RightPress,
+                    CGEventType::RightMouseUp => GrabEventType::RightRelease,
+                    CGEventType::MouseMoved | CGEventType::RightMouseDragged => {
+                        let loc = event.location();
+                        GrabEventType::MouseMove { x: loc.x, y: loc.y }
+                    }
+                    _ => GrabEventType::Other,
+                };
 
-            if handle_event(&tracker, &rx, grab_event) {
-                CallbackResult::Drop
-            } else {
-                CallbackResult::Keep
-            }
-        },
-        || CFRunLoop::run_current(),
-    )
+                if handle_event(&tracker, &rx, grab_event) {
+                    CallbackResult::Drop
+                } else {
+                    CallbackResult::Keep
+                }
+            },
+        )
+    }
     .map_err(|()| "Grab failed: CGEventTapCreate returned null (EventTapError).".to_string())?;
 
-    Ok(())
+    let loop_source = event_tap
+        .mach_port()
+        .create_runloop_source(0)
+        .expect("Runloop source creation failed");
+
+    // Add to default mode directly (with_enabled uses kCFRunLoopCommonModes
+    // which may not keep CFRunLoopRun() alive on all macOS versions).
+    CFRunLoop::get_current().add_source(&loop_source, unsafe { kCFRunLoopDefaultMode });
+    event_tap.enable();
+
+    log::info!("macOS event tap created and enabled, entering run loop");
+
+    // Run the loop with periodic wake-ups. macOS can silently disable an event
+    // tap if the callback takes too long; re-enable on each iteration.
+    loop {
+        CFRunLoop::run_in_mode(
+            unsafe { kCFRunLoopDefaultMode },
+            std::time::Duration::from_secs(5),
+            false,
+        );
+        event_tap.enable();
+    }
 }

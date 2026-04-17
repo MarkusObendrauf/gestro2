@@ -43,7 +43,19 @@ pub fn replay_right_click() {
 }
 
 /// Fire a keyboard shortcut using enigo.
+/// On macOS, enigo's key lookup calls TSMGetInputSourceProperty which must run
+/// on the main thread. We dispatch via GCD to avoid crashing.
 pub fn fire_shortcut(shortcut: &Shortcut) {
+    #[cfg(target_os = "macos")]
+    {
+        let shortcut = shortcut.clone();
+        dispatch_to_main(move || fire_shortcut_impl(&shortcut));
+    }
+    #[cfg(not(target_os = "macos"))]
+    fire_shortcut_impl(shortcut);
+}
+
+fn fire_shortcut_impl(shortcut: &Shortcut) {
     let Ok(mut enigo) = Enigo::new(&Settings::default()) else {
         log::error!("Failed to create Enigo instance");
         return;
@@ -87,6 +99,31 @@ pub fn fire_shortcut(shortcut: &Shortcut) {
             .join("+"),
         shortcut.key
     );
+}
+
+/// Dispatch a closure to the main GCD queue (macOS only).
+/// enigo's keyboard simulation calls TSMGetInputSourceProperty which
+/// requires the main dispatch queue.
+#[cfg(target_os = "macos")]
+fn dispatch_to_main<F: FnOnce() + Send + 'static>(f: F) {
+    extern "C" {
+        fn dispatch_get_main_queue() -> *const std::ffi::c_void;
+        fn dispatch_async_f(
+            queue: *const std::ffi::c_void,
+            context: *mut std::ffi::c_void,
+            work: unsafe extern "C" fn(*mut std::ffi::c_void),
+        );
+    }
+
+    unsafe extern "C" fn trampoline<F: FnOnce()>(context: *mut std::ffi::c_void) {
+        let f = unsafe { Box::from_raw(context as *mut F) };
+        f();
+    }
+
+    let context = Box::into_raw(Box::new(f)) as *mut std::ffi::c_void;
+    unsafe {
+        dispatch_async_f(dispatch_get_main_queue(), context, trampoline::<F>);
+    }
 }
 
 fn modifier_to_enigo(name: &str) -> Option<enigo::Key> {

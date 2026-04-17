@@ -6,6 +6,25 @@ use std::cell::RefCell;
 use std::sync::atomic::Ordering;
 use tauri::Emitter;
 
+/// Write a line to /tmp/gestro.log (macOS debug helper).
+/// No-op if the file can't be opened.
+#[cfg(target_os = "macos")]
+fn dlog(msg: std::fmt::Arguments) {
+    use std::io::Write;
+    if let Ok(mut f) = std::fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open("/tmp/gestro.log")
+    {
+        let _ = writeln!(f, "[{:?}] {}", std::time::SystemTime::now(), msg);
+    }
+}
+
+#[cfg(target_os = "macos")]
+macro_rules! dlog {
+    ($($arg:tt)*) => { dlog(format_args!($($arg)*)) };
+}
+
 /// Max retry attempts before giving up.
 const MAX_GRAB_RETRIES: u32 = 5;
 /// Delay between retries (doubles each attempt).
@@ -38,9 +57,13 @@ pub fn spawn(app: tauri::AppHandle, config: GestroConfig, config_rx: Receiver<Ge
             match grab_result {
                 Ok(()) => {
                     log::info!("Grab loop exited cleanly");
+                    #[cfg(target_os = "macos")]
+                    dlog!("spawn: grab loop exited cleanly (attempt {attempt})");
                     return;
                 }
                 Err(msg) => {
+                    #[cfg(target_os = "macos")]
+                    dlog!("spawn: grab failed: {msg}");
                     let hint = if cfg!(target_os = "linux") {
                         "Add your user to the 'input' group."
                     } else if cfg!(target_os = "macos") {
@@ -179,6 +202,8 @@ fn run_grab(
         CGEventType::RightMouseDragged,
     ];
 
+    dlog!("run_grab: creating event tap");
+
     // SAFETY: The event tap is dropped at the end of this function.
     // The captured references (tracker, rx) are owned by this stack frame
     // and outlive the tap.
@@ -190,16 +215,29 @@ fn run_grab(
             events,
             |_proxy, etype, event| {
                 let grab_event = match etype {
-                    CGEventType::RightMouseDown => GrabEventType::RightPress,
-                    CGEventType::RightMouseUp => GrabEventType::RightRelease,
+                    CGEventType::RightMouseDown => {
+                        dlog!("callback: RightMouseDown");
+                        GrabEventType::RightPress
+                    }
+                    CGEventType::RightMouseUp => {
+                        dlog!("callback: RightMouseUp");
+                        GrabEventType::RightRelease
+                    }
                     CGEventType::MouseMoved | CGEventType::RightMouseDragged => {
                         let loc = event.location();
                         GrabEventType::MouseMove { x: loc.x, y: loc.y }
                     }
-                    _ => GrabEventType::Other,
+                    _ => {
+                        dlog!("callback: Other event type {:?}", etype);
+                        GrabEventType::Other
+                    }
                 };
 
-                if handle_event(&tracker, &rx, grab_event) {
+                let suppress = handle_event(&tracker, &rx, grab_event);
+                if matches!(etype, CGEventType::RightMouseDown | CGEventType::RightMouseUp) {
+                    dlog!("callback: suppress={suppress}");
+                }
+                if suppress {
                     CallbackResult::Drop
                 } else {
                     CallbackResult::Keep
@@ -207,7 +245,12 @@ fn run_grab(
             },
         )
     }
-    .map_err(|()| "Grab failed: CGEventTapCreate returned null (EventTapError).".to_string())?;
+    .map_err(|()| {
+        dlog!("run_grab: CGEventTapCreate returned null!");
+        "Grab failed: CGEventTapCreate returned null (EventTapError).".to_string()
+    })?;
+
+    dlog!("run_grab: event tap created OK");
 
     let loop_source = event_tap
         .mach_port()
@@ -219,16 +262,21 @@ fn run_grab(
     CFRunLoop::get_current().add_source(&loop_source, unsafe { kCFRunLoopDefaultMode });
     event_tap.enable();
 
-    log::info!("macOS event tap created and enabled, entering run loop");
+    dlog!("run_grab: tap enabled, entering run loop");
 
     // Run the loop with periodic wake-ups. macOS can silently disable an event
     // tap if the callback takes too long; re-enable on each iteration.
+    let mut iteration = 0u64;
     loop {
-        CFRunLoop::run_in_mode(
+        let result = CFRunLoop::run_in_mode(
             unsafe { kCFRunLoopDefaultMode },
             std::time::Duration::from_secs(5),
             false,
         );
+        iteration += 1;
+        if iteration <= 3 || iteration % 12 == 0 {
+            dlog!("run_grab: run_in_mode returned {:?} (iteration {iteration})", result);
+        }
         event_tap.enable();
     }
 }

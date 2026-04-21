@@ -3,8 +3,11 @@ use crate::gesture::{GestureResult, GestureTracker};
 use crate::simulator::{self, SIMULATING};
 use crossbeam_channel::Receiver;
 use std::cell::RefCell;
-use std::sync::atomic::Ordering;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tauri::Emitter;
+
+/// Global flag to disable gesture recognition. When false, all events pass through.
+pub static ENABLED: AtomicBool = AtomicBool::new(true);
 
 /// Write a line to /tmp/gestro.log (macOS debug helper).
 /// No-op if the file can't be opened.
@@ -98,6 +101,11 @@ fn handle_event(
     // Check for config updates (non-blocking)
     if let Ok(new_config) = rx.try_recv() {
         tracker.borrow_mut().update_config(&new_config);
+    }
+
+    // If gestures are disabled, pass everything through
+    if !ENABLED.load(Ordering::Relaxed) {
+        return false;
     }
 
     // If we are replaying a right-click, pass through and count down

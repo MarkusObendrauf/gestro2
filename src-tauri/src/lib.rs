@@ -157,14 +157,28 @@ pub fn run() {
             grabber::spawn(app.handle().clone(), grab_config, grab_rx);
 
             // Build system tray
+            let toggle_item =
+                MenuItem::with_id(app, "toggle", "Disable", true, None::<&str>)?;
             let settings_item = MenuItem::with_id(app, "settings", "Settings", true, None::<&str>)?;
             let quit_item = MenuItem::with_id(app, "quit", "Quit", true, None::<&str>)?;
-            let menu = Menu::with_items(app, &[&settings_item, &quit_item])?;
+            let menu = Menu::with_items(app, &[&toggle_item, &settings_item, &quit_item])?;
 
             TrayIconBuilder::new()
                 .icon(app.default_window_icon().unwrap().clone())
                 .menu(&menu)
-                .on_menu_event(|app, event| match event.id.as_ref() {
+                .on_menu_event(move |app, event| match event.id.as_ref() {
+                    "toggle" => {
+                        use std::sync::atomic::Ordering;
+                        let was_enabled =
+                            grabber::ENABLED.fetch_xor(true, Ordering::Relaxed);
+                        let now_enabled = !was_enabled;
+                        let label = if now_enabled { "Disable" } else { "Enable" };
+                        let _ = toggle_item.set_text(label);
+                        log::info!(
+                            "Gestures {}",
+                            if now_enabled { "enabled" } else { "disabled" }
+                        );
+                    }
                     "settings" => open_settings_window(app),
                     "quit" => {
                         log::info!("Quit requested from tray");

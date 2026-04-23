@@ -8,8 +8,15 @@ pub static SIMULATING: AtomicU32 = AtomicU32::new(0);
 
 /// Replay a right-click at the current cursor position.
 pub fn replay_right_click() {
-    // Tell the grab callback to pass through the next 2 right-button events
-    SIMULATING.store(2, Ordering::SeqCst);
+    // Atomically set to 2 only if currently 0 — prevents concurrent replays
+    // from corrupting the counter.
+    if SIMULATING
+        .compare_exchange(0, 2, Ordering::SeqCst, Ordering::SeqCst)
+        .is_err()
+    {
+        log::debug!("Skipping overlapping right-click replay");
+        return;
+    }
 
     let press_ok = rdev::simulate(&rdev::EventType::ButtonPress(rdev::Button::Right));
     std::thread::sleep(std::time::Duration::from_millis(10));

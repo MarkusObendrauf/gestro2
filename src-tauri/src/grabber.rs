@@ -39,8 +39,9 @@ pub fn spawn(app: tauri::AppHandle, config: GestroConfig, config_rx: Receiver<Ge
     std::thread::spawn(move || {
         let mut current_config = config;
         let mut delay = INITIAL_RETRY_DELAY;
+        let mut fast_failures: u32 = 0;
 
-        for attempt in 0..=MAX_GRAB_RETRIES {
+        loop {
             // Drain any config updates that arrived while we were retrying
             while let Ok(new_config) = config_rx.try_recv() {
                 current_config = new_config;
@@ -49,20 +50,31 @@ pub fn spawn(app: tauri::AppHandle, config: GestroConfig, config_rx: Receiver<Ge
             let tracker = RefCell::new(GestureTracker::new(&current_config));
             let rx = config_rx.clone();
 
-            if attempt > 0 {
-                log::info!("Grab thread retry {attempt}/{MAX_GRAB_RETRIES}");
+            if fast_failures > 0 {
+                log::info!("Grab thread retry ({fast_failures}/{MAX_GRAB_RETRIES})");
             } else {
                 log::info!("Grab thread started");
             }
 
+            let started = std::time::Instant::now();
             let grab_result = run_grab(tracker, rx);
+            let ran_for = started.elapsed();
+
+            // If grab ran for a meaningful duration, it was working and exited
+            // due to a transient issue (device change, sleep/wake). Reset the
+            // failure count so we don't give up.
+            if ran_for > std::time::Duration::from_secs(10) {
+                fast_failures = 0;
+                delay = INITIAL_RETRY_DELAY;
+            }
 
             match grab_result {
                 Ok(()) => {
-                    log::info!("Grab loop exited cleanly");
+                    log::warn!(
+                        "Grab loop exited unexpectedly after {ran_for:?}; restarting"
+                    );
                     #[cfg(target_os = "macos")]
-                    dlog!("spawn: grab loop exited cleanly (attempt {attempt})");
-                    return;
+                    dlog!("spawn: grab exited after {ran_for:?}, restarting");
                 }
                 Err(msg) => {
                     #[cfg(target_os = "macos")]
@@ -78,15 +90,20 @@ pub fn spawn(app: tauri::AppHandle, config: GestroConfig, config_rx: Receiver<Ge
                     log::error!("{msg}");
                     let _ = app.emit("grab-error", msg);
 
-                    if attempt == MAX_GRAB_RETRIES {
-                        log::error!("Grab thread giving up after {MAX_GRAB_RETRIES} retries");
+                    fast_failures += 1;
+                    if fast_failures > MAX_GRAB_RETRIES {
+                        log::error!(
+                            "Grab thread giving up after {MAX_GRAB_RETRIES} consecutive failures"
+                        );
                         return;
                     }
-
-                    log::info!("Retrying grab in {}s...", delay.as_secs());
-                    std::thread::sleep(delay);
-                    delay *= 2;
                 }
+            }
+
+            log::info!("Restarting grab in {}s...", delay.as_secs());
+            std::thread::sleep(delay);
+            if fast_failures > 0 {
+                delay = (delay * 2).min(std::time::Duration::from_secs(60));
             }
         }
     });

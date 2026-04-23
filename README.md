@@ -16,13 +16,13 @@ If you right-click without dragging (or drag less than the threshold distance), 
 
 ```
             Up
-        ╲   |   ╱
+        ╲    |    ╱
     Up-Left  |  Up-Right
           ╲  |  ╱
   Left ────  ●  ──── Right
           ╱  |  ╲
   Down-Left  |  Down-Right
-        ╱   |   ╲
+        ╱    |    ╲
            Down
 ```
 
@@ -108,14 +108,14 @@ Here are some ideas for what to bind:
 
 | Direction | Action | Typical Shortcut |
 |-----------|--------|-----------------|
-| Left | Previous desktop | `Ctrl+Alt+Left` |
-| Right | Next desktop | `Ctrl+Alt+Right` |
-| Up | Mission Control / Overview | `Super` |
-| Down | Show desktop | `Super+D` |
-| Up-Right | New browser tab | `Ctrl+T` |
-| Down-Right | Close tab | `Ctrl+W` |
-| Up-Left | Undo | `Ctrl+Z` |
-| Down-Left | Volume mute | `AudioMute` |
+| Left | Previous tab | `Ctrl+[` |
+| Right | Next tab | `Ctrl+]` |
+| Up | New tab | `Ctrl+n` |
+| Down | Close tab | `Ctrl+w` |
+| Up-Left | Forward | `BrowserForward` |
+| Up-Right | Back | `BrowserBack` |
+| Down-Right | Refresh | `F5` |
+| Down-Left | Re-open closed tab | `Ctrl+Shift+t` |
 
 These are just suggestions — you can bind any keyboard shortcut to any direction.
 
@@ -132,12 +132,6 @@ These are just suggestions — you can bind any keyboard shortcut to any directi
 **macOS: Gestures still don't work after granting Accessibility**
 - Quit Gestro, run `tccutil reset Accessibility com.gestro.gestro` in Terminal, then relaunch and re-add it in System Settings > Privacy & Security > Accessibility.
 - Make sure you're launching from `/Applications`, not running the binary directly.
-
-**macOS: Browser navigation keys (BrowserBack/BrowserForward) don't work**
-- macOS has no standard keycodes for browser navigation. Use `Cmd+[` and `Cmd+]` instead, which work in most browsers.
-
-**Right-click menu stopped working**
-- This shouldn't happen. If you right-click without dragging (or drag only a tiny amount), Gestro passes through a normal right-click. Try increasing the threshold in settings if you're accidentally triggering gestures.
 
 **Tray icon doesn't appear**
 - Some desktop environments need a tray/appindicator extension. On GNOME, install the [AppIndicator extension](https://extensions.gnome.org/extension/615/appindicator-support/).

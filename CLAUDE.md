@@ -82,7 +82,6 @@ OS-wide mouse gesture launcher. Hold right-click, drag in a direction, release t
 | `main.ts` | Mounts Svelte `App` |
 | `lib/App.svelte` | Root: loads config, listens for `grab-error`, orchestrates child components |
 | `lib/GestureWheel.svelte` | SVG radial widget showing 8 direction wedges with bindings |
-| `lib/DirectionSlot.svelte` | Single direction display (used elsewhere, not in wheel) |
 | `lib/ShortcutCapture.svelte` | Modal: captures keyboard shortcut for a direction |
 | `lib/SettingsPanel.svelte` | Threshold slider, launch-at-login toggle |
 | `lib/StatusBar.svelte` | Running/error status indicator |

@@ -106,13 +106,13 @@
     transition: fill 0.15s;
   }
   .wedge:hover path {
-    fill: #1a4a7a;
+    fill: var(--surface-hover);
   }
   .wedge.bound path {
-    fill: #1a3a5c;
+    fill: var(--surface-alt);
   }
   .wedge.bound:hover path {
-    fill: #1a4a7a;
+    fill: var(--surface-hover);
   }
   .dir-label {
     font-size: 9px;

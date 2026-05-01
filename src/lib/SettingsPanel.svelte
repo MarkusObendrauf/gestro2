@@ -110,7 +110,7 @@
     width: 20px;
     height: 20px;
     border-radius: 50%;
-    background: white;
+    background: var(--on-accent);
     transition: transform 0.2s;
   }
   .toggle.active .toggle-knob {

@@ -32,7 +32,7 @@
     border-radius: 50%;
   }
   .dot.running {
-    background: #4caf50;
+    background: var(--success);
   }
   .dot.error {
     background: var(--accent);

@@ -2,9 +2,14 @@
   --bg: #1a1a2e;
   --bg-secondary: #16213e;
   --surface: #0f3460;
+  --surface-alt: #1a3a5c;
+  --surface-hover: #1a4a7a;
   --accent: #e94560;
+  --success: #4caf50;
   --text: #eee;
   --text-muted: #999;
+  --on-accent: #fff;
+  --overlay: rgba(0, 0, 0, 0.6);
   --radius: 8px;
 }
 
